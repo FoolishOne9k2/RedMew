@@ -1,6 +1,8 @@
-local Task = require 'utils.Task'
-local Token = require 'utils.global_token'
+local Task = require 'utils.task'
+local Token = require 'utils.token'
 local Event = require 'utils.event'
+
+local insert = table.insert
 
 local tiles_per_tick
 local regen_decoratives
@@ -8,22 +10,32 @@ local surfaces
 
 local total_calls
 
-local function do_tile(y, x, data, shape)
-    local function do_tile_inner(tile, pos)
-        if not tile then
-            table.insert(data.tiles, {name = 'out-of-map', position = pos})
-        elseif type(tile) == 'string' then
-            table.insert(data.tiles, {name = tile, position = pos})
-        end
-    end
+local Public = {}
 
+-- Set to false by modules that want to control the on_chunk_generated event themselves.
+Public.enable_register_events = true
+
+local function do_tile_inner(tiles, tile, pos)
+    if not tile then
+        insert(tiles, {name = 'out-of-map', position = pos})
+    elseif type(tile) == 'string' then
+        insert(tiles, {name = tile, position = pos})
+    end
+end
+
+local function do_tile(y, x, data, shape)
     local pos = {x, y}
 
     -- local coords need to be 'centered' to allow for correct rotation and scaling.
     local tile = shape(x + 0.5, y + 0.5, data)
 
     if type(tile) == 'table' then
-        do_tile_inner(tile.tile, pos)
+        do_tile_inner(data.tiles, tile.tile, pos)
+
+        local hidden_tile = tile.hidden_tile
+        if hidden_tile then
+            insert(data.hidden_tiles, {tile = hidden_tile, position = pos})
+        end
 
         local entities = tile.entities
         if entities then
@@ -31,18 +43,62 @@ local function do_tile(y, x, data, shape)
                 if not entity.position then
                     entity.position = pos
                 end
-                table.insert(data.entities, entity)
+                insert(data.entities, entity)
             end
         end
 
         local decoratives = tile.decoratives
         if decoratives then
             for _, decorative in ipairs(decoratives) do
-                table.insert(data.decoratives, decorative)
+                insert(data.decoratives, decorative)
             end
         end
     else
-        do_tile_inner(tile, pos)
+        do_tile_inner(data.tiles, tile, pos)
+    end
+end
+
+local function do_row(row, data, shape)
+    local y = data.top_y + row
+    local top_x = data.top_x
+    local tiles = data.tiles
+
+    data.y = y
+
+    for x = top_x, top_x + 31 do
+        data.x = x
+        local pos = {data.x, data.y}
+
+        -- local coords need to be 'centered' to allow for correct rotation and scaling.
+        local tile = shape(x + 0.5, y + 0.5, data)
+
+        if type(tile) == 'table' then
+            do_tile_inner(tiles, tile.tile, pos)
+
+            local hidden_tile = tile.hidden_tile
+            if hidden_tile then
+                insert(data.hidden_tiles, {tile = hidden_tile, position = pos})
+            end
+
+            local entities = tile.entities
+            if entities then
+                for _, entity in ipairs(entities) do
+                    if not entity.position then
+                        entity.position = pos
+                    end
+                    insert(data.entities, entity)
+                end
+            end
+
+            local decoratives = tile.decoratives
+            if decoratives then
+                for _, decorative in ipairs(decoratives) do
+                    insert(data.decoratives, decorative)
+                end
+            end
+        else
+            do_tile_inner(tiles, tile, pos)
+        end
     end
 end
 
@@ -50,27 +106,16 @@ local function do_place_tiles(data)
     data.surface.set_tiles(data.tiles, true)
 end
 
-local decoratives = {
-    'brown-asterisk',
-    'brown-carpet-grass',
-    'brown-fluff',
-    'brown-fluff-dry',
-    'brown-hairy-grass',
-    'garballo',
-    'garballo-mini-dry',
-    'green-asterisk',
-    'green-bush-mini',
-    'green-carpet-grass',
-    'green-hairy-grass',
-    'green-pita',
-    'green-pita-mini',
-    'green-small-grass',
-    'red-asterisk'
-}
+local function do_place_hidden_tiles(data)
+    local surface = data.surface
+    for _, t in ipairs(data.hidden_tiles) do
+        surface.set_hidden_tile(t.position, t.tile)
+    end
+end
 
 local function do_place_decoratives(data)
     if regen_decoratives then
-        data.surface.regenerate_decorative(decoratives, {{data.top_x / 32, data.top_y / 32}})
+        data.surface.regenerate_decorative(nil, {{data.top_x / 32, data.top_y / 32}})
     end
 
     local dec = data.decoratives
@@ -149,14 +194,18 @@ local function map_gen_action(data)
         data.y = 33
         return true
     elseif state == 33 then
-        do_place_entities(data)
+        do_place_hidden_tiles(data)
         data.y = 34
         return true
     elseif state == 34 then
-        do_place_decoratives(data)
+        do_place_entities(data)
         data.y = 35
         return true
     elseif state == 35 then
+        do_place_decoratives(data)
+        data.y = 36
+        return true
+    elseif state == 36 then
         run_chart_update(data)
         return false
     end
@@ -164,7 +213,9 @@ end
 
 local map_gen_action_token = Token.register(map_gen_action)
 
-local function on_chunk(event)
+--- Adds generation of a Chunk of the map to the queue
+-- @param event <table> the event table from on_chunk_generated
+function Public.schedule_chunk(event)
     local surface = event.surface
     local shape = surfaces[surface.name]
 
@@ -182,6 +233,7 @@ local function on_chunk(event)
         top_y = area.left_top.y,
         surface = surface,
         tiles = {},
+        hidden_tiles = {},
         entities = {},
         decoratives = {}
     }
@@ -189,14 +241,77 @@ local function on_chunk(event)
     Task.queue_task(map_gen_action_token, data, total_calls)
 end
 
-local function init(args)
+--- Generates a Chunk of map when called
+-- @param event <table> the event table from on_chunk_generated
+function Public.do_chunk(event)
+    local surface = event.surface
+    local shape = surfaces[surface.name]
+
+    if not shape then
+        return
+    end
+
+    local area = event.area
+
+    local data = {
+        area = area,
+        top_x = area.left_top.x,
+        top_y = area.left_top.y,
+        surface = surface,
+        tiles = {},
+        hidden_tiles = {},
+        entities = {},
+        decoratives = {}
+    }
+
+    for row = 0, 31 do
+        do_row(row, data, shape)
+    end
+
+    do_place_tiles(data)
+    do_place_hidden_tiles(data)
+    do_place_entities(data)
+    do_place_decoratives(data)
+end
+
+--- Sets the variables for the generate functions, should only be called from map_loader
+-- @param args <table>
+function Public.init(args)
     tiles_per_tick = args.tiles_per_tick or 32
     regen_decoratives = args.regen_decoratives or false
     surfaces = args.surfaces or {}
 
-    total_calls = math.ceil(1024 / tiles_per_tick) + 4
-
-    Event.add(defines.events.on_chunk_generated, on_chunk)
+    total_calls = math.ceil(1024 / tiles_per_tick) + 5
 end
 
-return init
+local do_chunk = Public.do_chunk
+local schedule_chunk = Public.schedule_chunk
+
+local function on_chunk(event)
+    if event.tick == 0 then
+        do_chunk(event)
+    else
+        schedule_chunk(event)
+    end
+end
+
+--- Registers the event to generate our map when Chunks are generated, should only be called from map_loader
+function Public.register()
+    if not Public.enable_register_events then
+        return
+    end
+
+    if _DEBUG then
+        Event.add(defines.events.on_chunk_generated, do_chunk)
+    else
+        Event.add(defines.events.on_chunk_generated, on_chunk)
+    end
+end
+
+--- Returns the surfaces that the generate functions will act on
+-- @return dictionary of surface_name -> shape function
+function Public.get_surfaces()
+    return surfaces
+end
+
+return Public

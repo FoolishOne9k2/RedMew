@@ -1,316 +1,141 @@
-require 'config'
-require 'utils.utils'
-require 'utils.list_utils'
+-- If you're looking to configure anything, you want config.lua. Nearly everything in this file is dictated by the config.
 
-local Game = require 'utils.game'
+-- Info on the data lifecycle and how we use it: https://github.com/Refactorio/RedMew/wiki/The-data-lifecycle
+require 'resources.data_stages'
+_LIFECYCLE = _STAGE.control -- Control stage
 
-require 'user_groups'
-require 'custom_commands'
-require 'base_data'
-require 'train_station_names'
-require 'nuke_control'
-require 'follow'
-require 'autodeconstruct'
-require 'corpse_util'
---require 'infinite_storage_chest'
-require 'fish_market'
-require 'reactor_meltdown'
-require 'train_saviour'
-require 'map_gen.shared.perlin_noise'
-require 'map_layout'
-require 'bot'
-require 'player_colors'
--- GUIs the order determines the order they appear at the top.
-require 'info'
-require 'player_list'
-require 'poll'
-require 'tag_group'
-require 'tasklist'
-require 'blueprint_helper'
-require 'paint'
-require 'score'
-require 'popup'
+-- Overrides the _G.print function
+require 'utils.print_override'
 
+-- Omitting the math library is a very bad idea
+require 'utils.math'
 
-local Event = require 'utils.event'
-local Donators = require 'resources.donators'
+-- Global Debug and make sure our version file is registered
+Debug = require 'utils.debug'
+require 'resources.version'
 
-local function player_created(event)
-    local player = Game.get_player_by_index(event.player_index)
+-- Config and map_loader dictate the map you play and the settings in it
+local config = require 'config'
+require 'map_gen.shared.map_loader' -- to change the map you're playing, modify map_selection.lua
 
-    if not player or not player.valid then
-        return
-    end
+-- Specific to RedMew hosts, can be disabled safely if not hosting on RedMew servers
+require 'features.server'
+require 'features.server_commands'
 
-    player.insert {name = MARKET_ITEM, count = 10}
-    player.insert {name = 'iron-gear-wheel', count = 8}
-    player.insert {name = 'iron-plate', count = 16}
-    player.print('Welcome to our Server. You can join our Discord at: redmew.com/discord')
-    player.print('Click the question mark in the top left corner for server infomation and map details.')
-    player.print('And remember.. Keep Calm And Spaghetti!')
+-- Library modules
+-- If missing, will cause other feature modules to fail
+require 'features.player_create'
+require 'features.rank_system'
 
-    local gui = player.gui
-    gui.top.style = 'slot_table_spacing_horizontal_flow'
-    gui.left.style = 'slot_table_spacing_vertical_flow'
+-- Feature modules
+-- Each can be disabled safely
+if config.train_saviour.enabled then
+    require 'features.train_saviour'
+end
+if config.infinite_storage_chest.enabled then
+    require 'features.infinite_storage_chest'
+end
+if config.autodeconstruct.enabled then
+    require 'features.autodeconstruct'
+end
+if config.hodor.enabled or config.auto_respond.enabled or config.mentions.enabled then
+    require 'features.chat_triggers'
+end
+if config.corpse_util.enabled then
+    require 'features.corpse_util'
+end
+if config.admin_commands.enabled then
+    require 'features.admin_commands'
+end
+if config.redmew_commands.enabled then
+    require 'features.redmew_commands'
+end
+if config.donator_commands.enabled then
+    require 'features.donator_commands'
+end
+if config.market.enabled then
+    require 'features.market'
+end
+if config.nuke_control.enabled then
+    require 'features.nuke_control'
+end
+if config.player_colors.enabled then
+    require 'features.player_colors'
+end
+if config.reactor_meltdown.enabled then
+    require 'features.reactor_meltdown'
+end
+if config.performance.enabled then
+    require 'features.performance'
+end
+if config.hail_hydra.enabled then
+    require 'map_gen.shared.hail_hydra'
+end
+if config.lazy_bastard.enabled then
+    require 'features.lazy_bastard'
+end
+if config.redmew_qol.enabled then
+    require 'features.redmew_qol'
+end
+if config.camera.enabled then
+    require 'features.gui.camera'
+end
+if config.day_night.enabled then
+    require 'map_gen.shared.day_night'
+end
+if config.apocalypse.enabled then
+    require 'features.apocalypse'
+end
+if config.player_onboarding.enabled then
+    require 'features.player_onboarding'
 end
 
-local hodor_messages = {
-    {'Hodor.', 16},
-    {'Hodor?', 16},
-    {'Hodor!', 16},
-    {'Hodor! Hodor! Hodor! Hodor!', 4},
-    {'Hodor :(', 4},
-    {'Hodor :)', 4},
-    {'HOOOODOOOR!', 4},
-    {'( ͡° ͜ʖ ͡°)', 1},
-    {'☉ ‿ ⚆', 1}
-}
-local message_weight_sum = 0
-for _, w in pairs(hodor_messages) do
-    message_weight_sum = message_weight_sum + w[2]
+-- GUIs
+-- The order determines the order they appear from left to right.
+-- These can be safely disabled if you want less GUI items.
+-- Some map presets will add GUI modules themselves.
+if config.map_info.enabled then
+    require 'features.gui.info'
+end
+if config.player_list.enabled then
+    require 'features.gui.player_list'
+end
+if config.evolution_progress.enabled then
+    require 'features.gui.evolution_progress'
+end
+if config.poll.enabled then
+    require 'features.gui.poll'
+end
+if config.tag_group.enabled then
+    require 'features.gui.tag_group'
+end
+if config.tasklist.enabled then
+    require 'features.gui.tasklist'
+end
+if config.blueprint_helper.enabled then
+    require 'features.gui.blueprint_helper'
+end
+if config.paint.enabled then
+    require 'features.gui.paint'
+end
+if config.score.enabled then
+    require 'features.gui.score'
+end
+if config.popup.enabled then
+    require 'features.gui.popup'
+end
+if config.rich_text_gui.enabled then
+    require 'features.gui.rich_text'
 end
 
-global.naughty_words_enabled = false
-global.naughty_words = {
-    ['ass'] = true,
-    ['bugger'] = true,
-    ['butt'] = true,
-    ['bum'] = true,
-    ['bummer'] = true,
-    ['christ'] = true,
-    ['crikey'] = true,
-    ['darn'] = true,
-    ['dam'] = true,
-    ['damn'] = true,
-    ['dang'] = true,
-    ['dagnabit'] = true,
-    ['dagnabbit'] = true,
-    ['drat'] = true,
-    ['fart'] = true,
-    ['feck'] = true,
-    ['frack'] = true,
-    ['freaking'] = true,
-    ['frick'] = true,
-    ['gay'] = true,
-    ['gee'] = true,
-    ['geez'] = true,
-    ['git'] = true,
-    ['god'] = true,
-    ['golly'] = true,
-    ['gosh'] = true,
-    ['heavens'] = true,
-    ['heck'] = true,
-    ['hell'] = true,
-    ['holy'] = true,
-    ['jerk'] = true,
-    ['jesus'] = true,
-    ['petes'] = true,
-    ["pete's"] = true,
-    ['poo'] = true,
-    ['satan'] = true,
-    ['willy'] = true,
-    ['wee'] = true,
-    ['yikes'] = true
-}
-
-local function hodor(event)
-    local message = event.message:lower()
-    if message:match('hodor') then
-        local index = math.random(1, message_weight_sum)
-        local message_weight_sum = 0
-        for _, m in pairs(hodor_messages) do
-            message_weight_sum = message_weight_sum + m[2]
-            if message_weight_sum >= index then
-                game.print('Hodor: ' .. m[1])
-                break
-            end
-        end
-    end
-
-    -- player_index is nil if the message came from the server,
-    -- and indexing Game.players with nil is apparently an error.
-    local player_index = event.player_index
-    if not player_index then
-        return
-    end
-
-    local player = Game.get_player_by_index(event.player_index)
-    if not player or not player.valid then
-        return
-    end
-
-    if message:match('discord') then
-        player.print('Did you ask about our discord server?')
-        player.print('You can find it here: redmew.com/discord')
-    end
-
-    if global.naughty_words_enabled then
-        local naughty_words = global.naughty_words
-        for word in message:gmatch('%S+') do
-            if naughty_words[word] then
-                game.print(player.name .. ' this is a Christian Factorio server, no swearing please!')
-                break
-            end
-        end
-    end
+-- Debug-only modules
+if _DEBUG then
+    require 'features.scenario_data_manipulation'
 end
-
-local function player_joined(event)
-    local player = Game.get_player_by_index(event.player_index)
-    if not player or not player.valid then
-        return
-    end
-
-    local message = Donators.welcome_messages[player.name]
-    if not message then
-        return
-    end
-
-    game.print(table.concat({'*** ', message, ' ***'}))
+-- Needs to be at bottom so tokens are registered last.
+if _DUMP_ENV then
+    require 'utils.dump_env'
 end
-
-Event.add(defines.events.on_player_created, player_created)
-Event.add(defines.events.on_player_joined_game, player_joined)
-Event.add(defines.events.on_console_chat, hodor)
-
-Event.add(
-    defines.events.on_console_command,
-    function(event)
-        local command = event.command
-        if command == 'c' or command == 'command' or command == 'silent-command' or command == 'hax' then
-            local p_index = event.player_index
-            local name
-            if p_index then
-                name = Game.get_player_by_index(event.player_index).name
-            else
-                name = '<server>'
-            end
-            local s = table.concat {'[Command] ', name, ' /', command, ' ', event.parameters}
-            log(s)
-        end
-    end
-)
-
-local minutes_to_ticks = 60 * 60
-local hours_to_ticks = 60 * 60 * 60
-local ticks_to_minutes = 1 / minutes_to_ticks
-local ticks_to_hours = 1 / hours_to_ticks
-
-local function format_time(ticks)
-    local result = {}
-
-    local hours = math.floor(ticks * ticks_to_hours)
-    if hours > 0 then
-        ticks = ticks - hours * hours_to_ticks
-        table.insert(result, hours)
-        if hours == 1 then
-            table.insert(result, 'hour')
-        else
-            table.insert(result, 'hours')
-        end
-    end
-
-    local minutes = math.floor(ticks * ticks_to_minutes)
-    table.insert(result, minutes)
-    if minutes == 1 then
-        table.insert(result, 'minute')
-    else
-        table.insert(result, 'minutes')
-    end
-
-    return table.concat(result, ' ')
+if _DEBUG then
+    require 'features.gui.debug.command'
 end
-
-global.cheated_items = {}
-global.cheated_items_by_timestamp = {}
-
-local Token = require 'utils.global_token'
-local Task = require 'utils.Task'
-
-local remove_token =
-    Token.register(
-    function(data)
-        local p = data.player
-        local stack = data.stack
-
-        local removed = p.remove_item(stack)
-
-        if removed > 0 then
-            stack.count = removed
-            p.surface.spill_item_stack(p.position, stack)
-        end
-    end
-)
-
-Event.add(
-    defines.events.on_player_crafted_item,
-    function(event)
-        local pi = event.player_index
-        local p = Game.get_player_by_index(pi)
-
-        if not p or not p.valid or not p.cheat_mode then
-            return
-        end
-
-        local cheat_items = global.cheated_items
-
-        local data = cheat_items[pi]
-        if not data then
-            data = {}
-            cheat_items[pi] = data
-        end
-
-        local stack = event.item_stack
-        local name = stack.name
-        local user_item_record = data[name] or {count = 0}
-        local count = user_item_record.count
-        local time = user_item_record['time'] or format_time(game.tick)
-        data[name] = {count = stack.count + count, time = time}
-
-        if _DEBUG then
-            return
-        end
-
-        Task.set_timeout_in_ticks(1, remove_token, {player = p, stack = stack})
-    end
-)
-
-function print_cheated_items()
-    local res = {}
-    local players = Game.players
-
-    for pi, data in pairs(global.cheated_items) do
-        res[players[pi].name] = data
-    end
-
-    game.player.print(serpent.block(res))
-end
-
-Event.add(
-    defines.events.on_console_command,
-    function(event)
-        local player_index = event.player_index
-        if not player_index then
-            return
-        end
-        local player = Game.get_player_by_index(player_index)
-        local command = event.parameters or ''
-        if player.name:lower() == 'gotze' and string.find(command, 'insert') then
-            string.gsub(
-                command,
-                '{.*}',
-                function(tblStr)
-                    local func = loadstring('return ' .. tblStr)
-                    if not func then
-                        return
-                    end
-                    local tbl = func()
-                    if tbl and tbl.name and tbl.count then
-                        player.remove_item {name = tbl.name, count = tbl.count}
-                        player.insert {name = 'raw-fish', count = math.floor(tbl.count / 1000) + 1}
-                    end
-                end
-            )
-        end
-    end
-)

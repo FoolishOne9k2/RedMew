@@ -1,42 +1,40 @@
-# RedMew Scenario
+[![Build Status](https://travis-ci.org/Refactorio/RedMew.svg?branch=develop)](https://travis-ci.org/Refactorio/RedMew)
+[![Discord](https://img.shields.io/discord/432567222481846283.svg)](https://redmew.com/discord)
+[![Downloads](https://img.shields.io/github/downloads/Refactorio/RedMew/total.svg)](https://github.com/Refactorio/RedMew/releases)
+[![License](https://img.shields.io/github/license/Refactorio/Redmew.svg)](LICENSE)
+[![Activity Level](https://img.shields.io/github/commit-activity/m/Refactorio/RedMew.svg)](https://github.com/Refactorio/RedMew/pulse/monthly)
 
-## Getting Started
+[![RedMew](redmew_git_banner.png)](http://redmew.com)
 
-To use our scenario download it [here](https://github.com/Valansch/RedMew/archive/develop.zip) and unzip it into %AppData%/factorio/scenarios/ (~/.factorio/scenarios for linux). If you are using our scenario for a public-facing multiplayer server, please be sure to provide attribution back here to the github and keep links to our discord/patreon/website intact. 
+### Quick note:
 
-## Generating maps
+Downloads of the repository and source code require the file `map_selection.lua.sample` to be renamed to `map_seleciton.lua`. The release assets have this file built in.
 
-  There are 3 ways to generate maps using our scenario: Vanilla, FactorioMapConverter and Custom Maps.
-  
-### Vanilla
-  Just start the scenario from the scenario menu and you are ready to go.
+# RedMew
 
-### Custom Maps
+RedMew is a Factorio community that hosts custom servers, maps in different shapes and sizes, scripted scenarios and
+modded servers. All of the games hosted are available to the public and our community is meant for players of all skill
+levels and experience. You can find out servers by searching for "RedMew" in the multiplayer lobby.
 
-  We have many premade map modules that you can combine to create a unique map.
-  
-  Checkout [map_gen/data/map_previews](https://github.com/Valansch/RedMew/tree/develop/map_gen/data/.map_previews) to view all our modules.
-  You can select and activate a module by removing the "--" infront of the module in the map_layout.lua file.
+## The Community
+You can join the RedMew community on Discord by visiting http://redmew.com/discord
 
-  You can mix as many modules as you want, as long as they logically fit together. 
+To join a RedMew Factorio server, follow the following steps in Factorio:
+ - From the main menu, press "Play"
+ - In the next window press "Multiplayer"
+ - Next select "Browse public games" (this requires a factorio account and may prompt you to log in)
+ - In the list of "Browse games" you can filter for "RedMew" and you will see all RedMew hosted maps
 
-  Futher instructions on this read the comments in the map_layout.lua file.
-### FactorioMapConverter
+> _Note_: Not every server in this list will be official. If you're in doubt, join our Discord and ask.
 
-You can generate your own maps from images. This works in 2 steps:
+## Documentation
+Looking for a way to play a RedMew scenario yourself? [Check out our wiki!](https://github.com/Refactorio/RedMew/wiki).
 
-First convert the image file into a lua file (For example image_data.lua). Then use our scenario to loa the image_data.lua file and generate the map from it.
+Are you a Content Creator looking to play a RedMew scenario? [Visit the Content Creator Guide!](https://docs.google.com/document/d/1KE20uAOIVeQG2-Kh7OjcmU39e71m1PLk79EGr1ZWn7c/edit?usp=sharing)
 
-To achieve this please follow these steps:
-1. Download the Map Converter [here](https://github.com/grilledham/FactorioMapConverter/releases) (Windows only) to generate the image_data.lua.
-2. Place your image_data.lua file in the folder /map_gen/data/presets/
-3. Create new lua file (for example my_image.lua) inside the folder map_gen/presets/. This file is used to configure your map (scale, translaten etc.)      
-To do this you can copy map_gen/presets/template.lua and replace line 8 to point to your image_data.lua
-4. Load your new preset by adding a new line to map_layout.lua. This should look similar to this:  
-```MAP_GEN = require "map_gen.presets.my_image.lua"```
-5. Load the scenario from the scenario menu.
-  
-  
-  
-  
-  
+## Contributing
+If you wish to contribute, don't hesitate to make a Pull Request or open an issue. When in doubt, you can always ask
+on [Discord](http://redmew.com/discord).
+
+## License
+The RedMew codebase is licensed under the [GPL3 License](LICENSE).

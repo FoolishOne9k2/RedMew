@@ -1,17 +1,27 @@
+local math = require 'utils.math'
+
+local pi = math.pi
+local random = math.random
+local abs = math.abs
+local floor = math.floor
+local ceil = math.ceil
+local max = math.max
+local sqrt = math.sqrt
+local sin = math.sin
+local cos = math.cos
+local atan2 = math.atan2
+local tau = math.tau
+local loga = math.log
+
 -- helpers
-tau = 2 * math.pi
-deg_to_rad = tau / 360
-local inv_pi = 1 / math.pi
-function degrees(angle)
-    return angle * deg_to_rad
-end
+local inv_pi = 1 / pi
 
 local Builders = {}
 
 local function add_entity(tile, entity)
     if type(tile) == 'table' then
         if tile.entities then
-            table.insert(tile.entities, entity)
+            tile.entities [#tile.entities + 1] = entity
         else
             tile.entities = {entity}
         end
@@ -86,18 +96,18 @@ end
 function Builders.square_diamond(size)
     size = size / 2
     return function(x, y)
-        return math.abs(x) + math.abs(y) <= size
+        return abs(x) + abs(y) <= size
     end
 end
 
-local rot = math.sqrt(2) / 2 -- 45 degree rotation.
+local rot = sqrt(2) / 2 -- 45 degree rotation.
 function Builders.rectangle_diamond(width, height)
     width = width / 2
     height = height / 2
     return function(x, y)
         local rot_x = rot * (x - y)
         local rot_y = rot * (x + y)
-        return math.abs(rot_x) < width and math.abs(rot_y) < height
+        return abs(rot_x) < width and abs(rot_y) < height
     end
 end
 
@@ -123,9 +133,9 @@ function Builders.sine_fill(width, height)
         local x2 = x * width_inv
         local y2 = y * height_inv
         if y <= 0 then
-            return y2 < math.sin(x2)
+            return y2 < sin(x2)
         else
-            return y2 > math.sin(x2)
+            return y2 > sin(x2)
         end
     end
 end
@@ -136,9 +146,9 @@ function Builders.sine_wave(width, height, thickness)
     thickness = thickness * 0.5
     return function(x, y)
         local x2 = x * width_inv
-        local y2 = math.sin(x2)
+        local y2 = sin(x2)
         y = y * height_inv
-        local d = math.abs(y2 - y)
+        local d = abs(y2 - y)
 
         return d < thickness
     end
@@ -151,8 +161,8 @@ function Builders.rectangular_spiral(x_size, optional_y_size)
     optional_y_size = 1 / optional_y_size
     return function(x, y)
         x, y = x * x_size, y * optional_y_size
-        x, y = math.floor(x + 0.5), math.floor(y + 0.5)
-        local a = -math.max(math.abs(x), math.abs(y))
+        x, y = floor(x + 0.5), floor(y + 0.5)
+        local a = -max(abs(x), abs(y)) -- because of absolutes, it's faster to use max than an if..then..else
 
         if a % 2 == 0 then
             return y ~= a or x == a
@@ -165,9 +175,9 @@ end
 function Builders.circular_spiral(in_thickness, total_thickness)
     local half_total_thickness = total_thickness * 0.5
     return function(x, y)
-        local d = math.sqrt(x * x + y * y)
+        local d = sqrt(x * x + y * y)
 
-        local angle = 1 + inv_pi * math.atan2(x, y)
+        local angle = 1 + inv_pi * atan2(x, y)
         local offset = d + (angle * half_total_thickness)
 
         return offset % total_thickness < in_thickness
@@ -178,14 +188,14 @@ function Builders.circular_spiral_grow(in_thickness, total_thickness, grow_facto
     local half_total_thickness = total_thickness * 0.5
     local inv_grow_factor = 1 / grow_factor
     return function(x, y)
-        local d = math.sqrt(x * x + y * y)
+        local d = sqrt(x * x + y * y)
 
         local factor = (d * inv_grow_factor) + 1
         local total_thickness2 = total_thickness * factor
         local in_thickness2 = in_thickness * factor
         local half_total_thickness2 = half_total_thickness * factor
 
-        local angle = 1 + inv_pi * math.atan2(x, y)
+        local angle = 1 + inv_pi * atan2(x, y)
         local offset = d + (angle * half_total_thickness2)
 
         return offset % total_thickness2 < in_thickness2
@@ -195,9 +205,9 @@ end
 function Builders.circular_spiral_n_threads(in_thickness, total_thickness, n_threads)
     local half_total_thickness = total_thickness * 0.5 * n_threads
     return function(x, y)
-        local d = math.sqrt(x * x + y * y)
+        local d = sqrt(x * x + y * y)
 
-        local angle = 1 + inv_pi * math.atan2(x, y)
+        local angle = 1 + inv_pi * atan2(x, y)
         local offset = d + (angle * half_total_thickness)
 
         return offset % total_thickness < in_thickness
@@ -208,14 +218,14 @@ function Builders.circular_spiral_grow_n_threads(in_thickness, total_thickness, 
     local half_total_thickness = total_thickness * 0.5 * n_threads
     local inv_grow_factor = 1 / grow_factor
     return function(x, y)
-        local d = math.sqrt(x * x + y * y)
+        local d = sqrt(x * x + y * y)
 
         local factor = (d * inv_grow_factor) + 1
         local total_thickness2 = total_thickness * factor
         local in_thickness2 = in_thickness * factor
         local half_total_thickness2 = half_total_thickness * factor
 
-        local angle = 1 + inv_pi * math.atan2(x, y)
+        local angle = 1 + inv_pi * atan2(x, y)
         local offset = d + (angle * half_total_thickness2)
 
         return offset % total_thickness2 < in_thickness2
@@ -290,11 +300,11 @@ function Builders.picture(pic)
     local height = pic.height
 
     -- the plus one is because lua tables are one based.
-    local half_width = math.floor(width / 2) + 1
-    local half_height = math.floor(height / 2) + 1
+    local half_width = floor(width / 2) + 1
+    local half_height = floor(height / 2) + 1
     return function(x, y)
-        x = math.floor(x)
-        y = math.floor(y)
+        x = floor(x)
+        y = floor(y)
         local x2 = x + half_width
         local y2 = y + half_height
 
@@ -325,8 +335,8 @@ function Builders.scale(shape, x_scale, y_scale)
 end
 
 function Builders.rotate(shape, angle)
-    local qx = math.cos(angle)
-    local qy = math.sin(angle)
+    local qx = cos(angle)
+    local qy = sin(angle)
     return function(x, y, world)
         local rot_x = qx * x - qy * y
         local rot_y = qy * x + qx * y
@@ -429,6 +439,12 @@ function Builders.combine(shapes)
     end
 end
 
+function Builders.add(shape1, shape2)
+    return function(x, y, world)
+        return shape1(x, y, world) or shape2(x, y, world)
+    end
+end
+
 function Builders.subtract(shape, minus_shape)
     return function(x, y, world)
         if minus_shape(x, y, world) then
@@ -503,8 +519,8 @@ end
 
 function Builders.linear_grow(shape, size)
     return function(x, y, world)
-        local t = math.ceil((y / size) + 0.5)
-        local n = math.ceil((math.sqrt(8 * t + 1) - 1) / 2)
+        local t = ceil((y / size) + 0.5)
+        local n = ceil((sqrt(8 * t + 1) - 1) / 2)
         local t_upper = n * (n + 1) * 0.5
         local t_lower = t_upper - n
 
@@ -518,9 +534,15 @@ end
 function Builders.grow(in_shape, out_shape, size, offset)
     local half_size = size / 2
     return function(x, y, world)
-        local tx = math.ceil(math.abs(x) / half_size)
-        local ty = math.ceil(math.abs(y) / half_size)
-        local t = math.max(tx, ty)
+        local tx = ceil(abs(x) / half_size)
+        local ty = ceil(abs(y) / half_size)
+
+        local t
+        if tx > ty then
+            t = tx
+        else
+            t = ty
+        end
 
         for i = t, 2.5 * t, 1 do
             local out_t = 1 / (i - offset)
@@ -541,15 +563,15 @@ function Builders.grow(in_shape, out_shape, size, offset)
 end
 
 function Builders.project(shape, size, r)
-    local ln_r = math.log(r)
+    local ln_r = loga(r)
     local r2 = 1 / (r - 1)
     local a = 1 / size
 
     return function(x, y, world)
         local offset = 0.5 * size
-        local sn = math.ceil(y + offset)
+        local sn = ceil(y + offset)
 
-        local n = math.ceil(math.log((r - 1) * sn * a + 1) / ln_r - 1)
+        local n = ceil(loga((r - 1) * sn * a + 1) / ln_r - 1)
         local rn = r ^ n
         local rn2 = 1 / rn
         local c = size * rn
@@ -563,16 +585,16 @@ function Builders.project(shape, size, r)
 end
 
 function Builders.project_pattern(pattern, size, r, columns, rows)
-    local ln_r = math.log(r)
+    local ln_r = loga(r)
     local r2 = 1 / (r - 1)
     local a = 1 / size
     local half_size = size / 2
 
     return function(x, y, world)
         local offset = 0.5 * size
-        local sn = math.ceil(y + offset)
+        local sn = ceil(y + offset)
 
-        local n = math.ceil(math.log((r - 1) * sn * a + 1) / ln_r - 1)
+        local n = ceil(loga((r - 1) * sn * a + 1) / ln_r - 1)
         local rn = r ^ n
         local rn2 = 1 / rn
         local c = size * rn
@@ -585,7 +607,7 @@ function Builders.project_pattern(pattern, size, r, columns, rows)
         local row = pattern[row_i]
 
         local x2 = ((x + half_size) % size) - half_size
-        local col_pos = math.floor(x / size + 0.5)
+        local col_pos = floor(x / size + 0.5)
         local col_i = col_pos % columns + 1
 
         local shape = row[col_i]
@@ -595,15 +617,15 @@ function Builders.project_pattern(pattern, size, r, columns, rows)
 end
 
 function Builders.project_overlap(shape, size, r)
-    local ln_r = math.log(r)
+    local ln_r = loga(r)
     local r2 = 1 / (r - 1)
     local a = 1 / size
     local offset = 0.5 * size
 
     return function(x, y, world)
-        local sn = math.ceil(y + offset)
+        local sn = ceil(y + offset)
 
-        local n = math.ceil(math.log((r - 1) * sn * a + 1) / ln_r - 1)
+        local n = ceil(loga((r - 1) * sn * a + 1) / ln_r - 1)
         local rn = r ^ n
         local rn2 = 1 / rn
         local c = size * rn
@@ -745,9 +767,11 @@ function Builders.single_pattern_overlap(shape, width, height)
         y = ((y + half_height) % height) - half_height
         x = ((x + half_width) % width) - half_width
 
-        return shape(x, y, world) or shape(x + width, y, world) or shape(x - width, y, world) or
-            shape(x, y + height, world) or
-            shape(x, y - height, world)
+        return shape(x, y, world) or
+        shape(x + width, y, world) or
+        shape(x - width, y, world) or
+        shape(x, y + height, world) or
+        shape(x, y - height, world)
     end
 end
 
@@ -773,12 +797,26 @@ function Builders.single_y_pattern(shape, height)
     end
 end
 
+function Builders.single_grid_pattern(shape, width, height)
+    shape = shape or Builders.empty_shape
+
+    local half_width = width / 2
+    local half_height = height / 2
+
+    return function(x, y, world)
+        x = ((x + half_width) % width) - half_width
+        y = ((y + half_height) % height) - half_height
+
+        return shape(x, y, world)
+    end
+end
+
 function Builders.grid_x_pattern(pattern, columns, width)
     local half_width = width / 2
 
     return function(x, y, world)
         local x2 = ((x + half_width) % width) - half_width
-        local columns_pos = math.floor(x / width + 0.5)
+        local columns_pos = floor(x / width + 0.5)
         local column_i = columns_pos % columns + 1
         local shape = pattern[column_i] or Builders.empty_shape
 
@@ -791,7 +829,7 @@ function Builders.grid_y_pattern(pattern, rows, height)
 
     return function(x, y, world)
         local y2 = ((y + half_height) % height) - half_height
-        local row_pos = math.floor(y / height + 0.5)
+        local row_pos = floor(y / height + 0.5)
         local row_i = row_pos % rows + 1
         local shape = pattern[row_i] or Builders.empty_shape
 
@@ -805,12 +843,12 @@ function Builders.grid_pattern(pattern, columns, rows, width, height)
 
     return function(x, y, world)
         local y2 = ((y + half_height) % height) - half_height
-        local row_pos = math.floor(y / height + 0.5)
+        local row_pos = floor(y / height + 0.5)
         local row_i = row_pos % rows + 1
         local row = pattern[row_i] or {}
 
         local x2 = ((x + half_width) % width) - half_width
-        local col_pos = math.floor(x / width + 0.5)
+        local col_pos = floor(x / width + 0.5)
         local col_i = col_pos % columns + 1
 
         local shape = row[col_i] or Builders.empty_shape
@@ -824,12 +862,12 @@ function Builders.grid_pattern_overlap(pattern, columns, rows, width, height)
 
     return function(x, y, world)
         local y2 = ((y + half_height) % height) - half_height
-        local row_pos = math.floor(y / height + 0.5)
+        local row_pos = floor(y / height + 0.5)
         local row_i = row_pos % rows + 1
         local row = pattern[row_i] or {}
 
         local x2 = ((x + half_width) % width) - half_width
-        local col_pos = math.floor(x / width + 0.5)
+        local col_pos = floor(x / width + 0.5)
         local col_i = col_pos % columns + 1
 
         local shape = row[col_i] or Builders.empty_shape
@@ -875,12 +913,12 @@ function Builders.grid_pattern_full_overlap(pattern, columns, rows, width, heigh
 
     return function(x, y, world)
         local y2 = ((y + half_height) % height) - half_height
-        local row_pos = math.floor(y / height + 0.5)
+        local row_pos = floor(y / height + 0.5)
         local row_i = row_pos % rows + 1
         local row = pattern[row_i] or {}
 
         local x2 = ((x + half_width) % width) - half_width
-        local col_pos = math.floor(x / width + 0.5)
+        local col_pos = floor(x / width + 0.5)
         local col_i = col_pos % columns + 1
 
         local row_i_up = (row_pos - 1) % rows + 1
@@ -945,8 +983,19 @@ function Builders.grid_pattern_full_overlap(pattern, columns, rows, width, heigh
     end
 end
 
+-- Tile a shape in a circular pattern
+function Builders.circular_pattern(shape, quantity, radius)
+    local pattern = {}
+    local angle = tau / quantity
+    for i = 1, quantity do
+        local shape2 = Builders.rotate(Builders.translate(shape, 0, radius), i * angle)
+        pattern[i] = shape2
+    end
+    return Builders.any(pattern)
+end
+
 local function is_spiral(x, y)
-    local a = -math.max(math.abs(x), math.abs(y))
+    local a = -max(abs(x), abs(y)) -- because of absolutes, it's faster to use max than an if..then..else
 
     if a % 2 == 0 then
         return y ~= a or x == a
@@ -959,8 +1008,8 @@ function Builders.single_spiral_pattern(shape, width, height)
     local inv_width = 1 / width
     local inv_height = 1 / height
     return function(x, y, world)
-        local x1 = math.floor(x * inv_width + 0.5)
-        local y1 = math.floor(y * inv_height + 0.5)
+        local x1 = floor(x * inv_width + 0.5)
+        local y1 = floor(y * inv_height + 0.5)
 
         if is_spiral(x1, y1) then
             x1 = x - x1 * width
@@ -989,7 +1038,7 @@ local function rotate_270(x, y)
 end
 
 local function spiral_rotation(x, y)
-    local a = -math.max(math.abs(x), math.abs(y))
+    local a = -max(abs(x), abs(y)) -- because of absolutes, it's faster to use max than an if..then..else
 
     if a % 2 == 0 then
         if y ~= a or x == a then
@@ -1014,8 +1063,8 @@ function Builders.single_spiral_rotate_pattern(shape, width, optional_height)
     local inv_width = 1 / width
     local inv_height = 1 / optional_height
     return function(x, y, world)
-        local x1 = math.floor(x * inv_width + 0.5)
-        local y1 = math.floor(y * inv_height + 0.5)
+        local x1 = floor(x * inv_width + 0.5)
+        local y1 = floor(y * inv_height + 0.5)
 
         local t = spiral_rotation(x1, y1)
         if t then
@@ -1035,9 +1084,9 @@ function Builders.circular_spiral_pattern(in_thickness, total_thickness, pattern
     local half_total_thickness = total_thickness * 0.5
     local delta = total_thickness / n_threads
     return function(x, y, world)
-        local d = math.sqrt(x * x + y * y)
+        local d = sqrt(x * x + y * y)
 
-        local angle = 1 + inv_pi * math.atan2(x, y)
+        local angle = 1 + inv_pi * atan2(x, y)
 
         local offset = d + (angle * half_total_thickness)
         if offset % total_thickness < in_thickness then
@@ -1062,7 +1111,7 @@ function Builders.circular_spiral_grow_pattern(in_thickness, total_thickness, gr
     local inv_grow_factor = 1 / grow_factor
     local delta = total_thickness / n_threads
     return function(x, y, world)
-        local d = math.sqrt(x * x + y * y)
+        local d = sqrt(x * x + y * y)
 
         local factor = (d * inv_grow_factor) + 1
         local total_thickness2 = total_thickness * factor
@@ -1070,7 +1119,7 @@ function Builders.circular_spiral_grow_pattern(in_thickness, total_thickness, gr
         local half_total_thickness2 = half_total_thickness * factor
         local delta2 = delta * factor
 
-        local angle = 1 + inv_pi * math.atan2(x, y)
+        local angle = 1 + inv_pi * atan2(x, y)
 
         local offset = d + (angle * half_total_thickness2)
         if offset % total_thickness2 < in_thickness2 then
@@ -1092,8 +1141,8 @@ function Builders.segment_pattern(pattern)
     local count = #pattern
 
     return function(x, y, world)
-        local angle = math.atan2(-y, x)
-        local index = math.floor(angle / tau * count) % count + 1
+        local angle = atan2(-y, x)
+        local index = floor(angle / tau * count) % count + 1
         local shape = pattern[index] or Builders.empty_shape
         return shape(x, y, world)
     end
@@ -1105,7 +1154,7 @@ function Builders.pyramid_pattern(pattern, columns, rows, width, height)
 
     return function(x, y, world)
         local y2 = ((y + half_height) % height) - half_height
-        local row_pos = math.floor(y / height + 0.5)
+        local row_pos = floor(y / height + 0.5)
         local row_i = row_pos % rows + 1
         local row = pattern[row_i] or {}
 
@@ -1114,7 +1163,7 @@ function Builders.pyramid_pattern(pattern, columns, rows, width, height)
         end
 
         local x2 = ((x + half_width) % width) - half_width
-        local col_pos = math.floor(x / width + 0.5)
+        local col_pos = floor(x / width + 0.5)
         local col_i = col_pos % columns + 1
 
         if col_pos > row_pos / 2 or -col_pos > (row_pos + 1) / 2 then
@@ -1132,7 +1181,7 @@ function Builders.pyramid_pattern_inner_overlap(pattern, columns, rows, width, h
 
     return function(x, y, world)
         local y2 = ((y + half_height) % height) - half_height
-        local row_pos = math.floor(y / height + 0.5)
+        local row_pos = floor(y / height + 0.5)
         local row_i = row_pos % rows + 1
         local row = pattern[row_i] or {}
 
@@ -1150,7 +1199,7 @@ function Builders.pyramid_pattern_inner_overlap(pattern, columns, rows, width, h
         x_even = ((x_even + half_width) % width) - half_width
         x_odd = ((x_odd + half_width) % width) - half_width
 
-        local col_pos = math.floor(x / width + 0.5)
+        local col_pos = floor(x / width + 0.5)
 
         local offset = 1
         local offset_odd = 0
@@ -1234,16 +1283,16 @@ function Builders.grid_pattern_offset(pattern, columns, rows, width, height)
 
     return function(x, y, world)
         local y2 = ((y + half_height) % height) - half_height
-        local row_pos = math.floor(y / height + 0.5)
+        local row_pos = floor(y / height + 0.5)
         local row_i = row_pos % rows + 1
         local row = pattern[row_i] or {}
 
         local x2 = ((x + half_width) % width) - half_width
-        local col_pos = math.floor(x / width + 0.5)
+        local col_pos = floor(x / width + 0.5)
         local col_i = col_pos % columns + 1
 
-        y2 = y2 + height * math.floor((row_pos + 1) / rows)
-        x2 = x2 + width * math.floor((col_pos + 1) / columns)
+        y2 = y2 + height * floor((row_pos + 1) / rows)
+        x2 = x2 + width * floor((col_pos + 1) / columns)
 
         local shape = row[col_i] or Builders.empty_shape
         return shape(x2, y2, world)
@@ -1269,17 +1318,80 @@ function Builders.change_tile(shape, old_tile, new_tile)
     end
 end
 
+local path_tiles = {
+    ['concrete'] = true,
+    ['hazard-concrete-left'] = true,
+    ['hazard-concrete-right'] = true,
+    ['stone-path'] = true,
+    ['refined-concrete'] = true,
+    ['refined-hazard-concrete-left'] = true,
+    ['refined-hazard-concrete-right'] = true
+}
+
+Builders.path_tiles = path_tiles
+
+function Builders.set_hidden_tile(shape, hidden_tile)
+    return function(x, y, world)
+        local tile = shape(x, y, world)
+
+        if type(tile) == 'table' and path_tiles[tile.tile] then
+            tile.hidden_tile = hidden_tile
+        elseif path_tiles[tile] then
+            tile = {tile = tile, hidden_tile = hidden_tile}
+        end
+
+        return tile
+    end
+end
+
+local collision_map = {
+    ['concrete'] = 'ground-tile',
+    ['deepwater-green'] = 'water-tile',
+    ['deepwater'] = 'water-tile',
+    ['dirt-1'] = 'ground-tile',
+    ['dirt-2'] = 'ground-tile',
+    ['dirt-3'] = 'ground-tile',
+    ['dirt-4'] = 'ground-tile',
+    ['dirt-5'] = 'ground-tile',
+    ['dirt-6'] = 'ground-tile',
+    ['dirt-7'] = 'ground-tile',
+    ['dry-dirt'] = 'ground-tile',
+    ['grass-1'] = 'ground-tile',
+    ['grass-2'] = 'ground-tile',
+    ['grass-3'] = 'ground-tile',
+    ['grass-4'] = 'ground-tile',
+    ['hazard-concrete-left'] = 'ground-tile',
+    ['hazard-concrete-right'] = 'ground-tile',
+    ['lab-dark-1'] = 'ground-tile',
+    ['lab-dark-2'] = 'ground-tile',
+    ['lab-white'] = 'ground-tile',
+    ['out-of-map'] = false,
+    ['red-desert-0'] = 'ground-tile',
+    ['red-desert-1'] = 'ground-tile',
+    ['red-desert-2'] = 'ground-tile',
+    ['red-desert-3'] = 'ground-tile',
+    ['sand-1'] = 'ground-tile',
+    ['sand-2'] = 'ground-tile',
+    ['sand-3'] = 'ground-tile',
+    ['stone-path'] = 'ground-tile',
+    ['water-green'] = 'water-tile',
+    ['water'] = 'water-tile',
+    ['refined-concrete'] = 'ground-tile',
+    ['refined-hazard-concrete-left'] = 'ground-tile',
+    ['refined-hazard-concrete-right'] = 'ground-tile'
+}
+
 function Builders.change_collision_tile(shape, collides, new_tile)
     return function(x, y, world)
         local tile = shape(x, y, world)
 
         if type(tile) == 'table' then
-            if tile.tile.collides_with(collides) then
+            if collision_map[tile.tile] == collides then
                 tile.tile = new_tile
                 return tile
             end
         else
-            if tile.collides_with(collides) then
+            if collision_map[tile] == collides then
                 return new_tile
             end
         end
@@ -1313,6 +1425,27 @@ function Builders.change_map_gen_tile(shape, old_tile, new_tile)
     end
 end
 
+function Builders.change_map_gen_hidden_tile(shape, old_tile, hidden_tile)
+    return function(x, y, world)
+        local function is_collides()
+            local gen_tile = world.surface.get_tile(world.x, world.y)
+            return gen_tile.name == old_tile
+        end
+
+        local tile = shape(x, y, world)
+
+        if type(tile) == 'table' then
+            if path_tiles[tile.tile] and is_collides() then
+                tile.hidden_tile = hidden_tile
+            end
+        elseif path_tiles[tile] and is_collides() then
+            tile = {tile = tile, hidden_tile = hidden_tile}
+        end
+
+        return tile
+    end
+end
+
 -- only changes tiles made by the factorio map generator.
 function Builders.change_map_gen_collision_tile(shape, collides, new_tile)
     return function(x, y, world)
@@ -1332,6 +1465,27 @@ function Builders.change_map_gen_collision_tile(shape, collides, new_tile)
             tile.tile = handle_tile(tile.tile)
         else
             tile = handle_tile(tile)
+        end
+
+        return tile
+    end
+end
+
+function Builders.change_map_gen_collision_hidden_tile(shape, collides, hidden_tile)
+    return function(x, y, world)
+        local function is_collides()
+            local gen_tile = world.surface.get_tile(world.x, world.y)
+            return gen_tile.collides_with(collides)
+        end
+
+        local tile = shape(x, y, world)
+
+        if type(tile) == 'table' then
+            if path_tiles[tile.tile] and is_collides() then
+                tile.hidden_tile = hidden_tile
+            end
+        elseif path_tiles[tile] and is_collides() then
+            tile = {tile = tile, hidden_tile = hidden_tile}
         end
 
         return tile
@@ -1383,11 +1537,11 @@ function Builders.fish(shape, spawn_rate)
     return function(x, y, world)
         local function handle_tile(tile)
             if type(tile) == 'string' then
-                if water_tiles[tile] and spawn_rate >= math.random() then
+                if water_tiles[tile] and spawn_rate >= random() then
                     return {name = 'fish'}
                 end
             elseif tile then
-                if world.surface.get_tile(world.x, world.y).collides_with('water-tile') and spawn_rate >= math.random() then
+                if world.surface.get_tile(world.x, world.y).collides_with('water-tile') and spawn_rate >= random() then
                     return {name = 'fish'}
                 end
             end
@@ -1417,36 +1571,42 @@ end
 function Builders.apply_effect(shape, func)
     return function(x, y, world)
         local tile = shape(x, y, world)
+
+        if not tile then
+            return tile
+        end
+
         return func(x, y, world, tile)
     end
 end
 
 function Builders.manhattan_value(base, mult)
     return function(x, y)
-        return mult * (math.abs(x) + math.abs(y)) + base
+        return mult * (abs(x) + abs(y)) + base
     end
 end
 
 function Builders.euclidean_value(base, mult)
     return function(x, y)
-        return mult * math.sqrt(x * x + y * y) + base
+        return mult * sqrt(x * x + y * y) + base
     end
 end
 
 function Builders.exponential_value(base, mult, pow)
     return function(x, y)
-        local d = math.sqrt(x * x + y * y)
-        return base + mult * d ^ pow
+        local d_sq = x * x + y * y
+        return base + mult * d_sq ^ (pow / 2)
     end
 end
 
 function Builders.prepare_weighted_array(array)
     local total = 0
     local weights = {}
-
+    local weight_counter = 1
     for _, v in ipairs(array) do
         total = total + v.weight
-        table.insert(weights, total)
+        weights[weight_counter] = total
+        weight_counter = weight_counter + 1
     end
 
     weights.total = total
